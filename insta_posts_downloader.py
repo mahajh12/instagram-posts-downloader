@@ -1,41 +1,13 @@
-"""
-A script to download all pictures from an Instagram account.
-
-Author: Javed Ali 
-Email: javedali28@gmail.com
-Date: April 2, 2024
-
-This script allows users to download all posts (images and videos) from a specified Instagram
-profile, whether public or private. For private profiles, the user must provide their own
-Instagram credentials and must have been granted access to the private profile.
-
-The script prompts the user for the Instagram username they wish to download content from.
-If the profile is private, the user is asked if they need to log in and, if so, to provide
-their Instagram username and password.
-
-The script then uses the instaloader library to download all posts from the specified profile
-into a folder named after the username in the current working directory.
-
-Requirements:
-- Python 3.x
-- instaloader module (install with `pip install instaloader`)
-
-Features:
-- Supports downloading from public and private Instagram profiles.
-- Requires user login for accessing private profiles, with support for two-factor authentication.
-- Provides informative error messages for common issues like bad credentials or non-existent profiles.
-
-Usage:
-1. Ensure Python 3.x and Instaloader are installed on your system.
-2. Run the script in a terminal or command prompt.
-3. Follow the on-screen prompts to enter the target Instagram username and login credentials if necessary.
-
-License: MIT License
-
-NOTE: This script is intended for educational and personal use. Please respect the privacy and copyright of Instagram users and comply with Instagram's terms of use.
-"""
-
 # Import all required libraries
+'''
+   
+The updated script is designed to handle errors when downloading posts from Instagram. 
+If it encounters a post that returns a 404 or 410 error (which means the post is no longer available),
+ it won’t crash or stop the entire process like it did to me in the orginal code. 
+ Instead, it will simply print a message saying that the post couldn’t
+ be downloaded and move on to the next one. This way, even if some posts are missing, the script can continue 
+ downloading the rest, making it much more user-friendly and efficient for anyone trying to save content from a profile.
+'''
 import instaloader
 import getpass
 import sys
@@ -55,7 +27,8 @@ def get_credentials():
 def download_posts(loader, profile):
     """
     Downloads all posts from the given Instagram profile using the specified loader.
-
+    Skips posts that are already downloaded or produce 404/410 errors.
+    
     Args:
         loader (instaloader.Instaloader): An instance of the Instaloader class.
         profile (instaloader.Profile): The Instagram profile to download posts from.
@@ -65,7 +38,24 @@ def download_posts(loader, profile):
     
     # Download all posts from the profile
     for post in profile.get_posts():
-        loader.download_post(post, target=profile.username)
+        # Create a filename based on the post's date and shortcode
+        filename = f"{post.date_utc.strftime('%Y-%m-%d_%H-%M-%S')}_{post.shortcode}"
+        
+        # Check if the post has already been downloaded (image or video)
+        if os.path.exists(f"{profile.username}/{filename}.jpg") or os.path.exists(f"{profile.username}/{filename}.mp4"):
+            print(f"Skipping {filename}, already downloaded.")
+            continue  # Skip this post if it's already downloaded
+        
+        try:
+            # Attempt to download the post
+            loader.download_post(post, target=profile.username)
+        except instaloader.exceptions.InstaloaderException as e:
+            # Handle specific instaloader exceptions like 404 Not Found or 410 Gone
+            if "404" in str(e) or "410" in str(e):
+                print(f"Post {filename} returned a 404/410 error. Skipping...")
+            else:
+                print(f"An error occurred while downloading post {filename}: {str(e)}")
+            continue  # Skip to the next post
 
 def main():
     """
